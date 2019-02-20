@@ -7,16 +7,22 @@ import re
 import itchat
 from itchat.content import TEXT, MAP, CARD, NOTE, SHARING, PICTURE, RECORDING, VOICE, ATTACHMENT, VIDEO, FRIENDS, SYSTEM
 
+from tools import get_userid, get_reply
+
 # 消息缓存字典与最大存储量
 msgs = OrderedDict()
 MAX_MSG_COUNT = 20
 
 # 直接回复名单
-reply_list = ['卓卓', '天王', '我给大家吐个槽']
+reply_list = list()
+# 自动回复
+AUTO_REPLY = False
 
 # 用户和群组的文本消息记录
 @itchat.msg_register(TEXT, isFriendChat=True, isGroupChat=True)
 def record_msg(msg):
+    global AUTO_REPLY
+    global reply_list
     msg_id = msg['MsgId']
     # 区分用户和群组
     is_user = msg['User']['MemberCount'] == 0
@@ -38,6 +44,29 @@ def record_msg(msg):
     if len(msgs) > MAX_MSG_COUNT:
         msgs.popitem(last=False)
 
+    # 使用 `开启/关闭自动回复 群组名` 来这个格式来开关
+    if 'Leo' in tmp_msg['from']:
+        if '开启自动回复' in tmp_msg['content']:
+            AUTO_REPLY = True
+            reply_list.append(tmp_msg['content'].split(' ')[-1])
+            print(reply_list)
+            print(tmp_msg['content'])
+        elif '关闭自动回复' in tmp_msg['content']:
+            AUTO_REPLY = False
+            reply_list.remove(tmp_msg['content'].split(' ')[-1])
+            print(reply_list)
+            print(tmp_msg['content'])
+        return
+
+    # 特定群组机器人回复
+    if any(x in tmp_msg['from'] for x in reply_list) and AUTO_REPLY:
+        user_id = get_userid(tmp_msg['from'])
+        reply = get_reply(tmp_msg['content'], userId=user_id)
+        if not reply:
+            itchat.send('[AUTO] 回复失败' + str(tmp_msg), toUserName='filehelper')
+        else:
+            itchat.send('[AUTO] ' + reply, toUserName=tmp_msg['from_id'])
+
 
 # 撤回NOTE时查找id并在缓存字典中取出
 @itchat.msg_register(NOTE, isFriendChat=True, isGroupChat=True)
@@ -55,7 +84,7 @@ def send_backed_msg(msg):
                     backed_msg['content'],
                 )
         # 匹配直接回复名单
-        if any(x in backed_msg['from'] for x in reply_list) :
+        if any(x in backed_msg['from'] for x in reply_list):
             itchat.send(tmp_msg, toUserName=backed_msg['from_id'])
         # 发到文件助手
         itchat.send(tmp_msg, toUserName='filehelper')
