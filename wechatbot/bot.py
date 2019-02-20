@@ -17,17 +17,23 @@ reply_list = ['卓卓', '天王', '我给大家吐个槽']
 # 用户和群组的文本消息记录
 @itchat.msg_register(TEXT, isFriendChat=True, isGroupChat=True)
 def record_msg(msg):
-    pprint(msg['Content'])
     msg_id = msg['MsgId']
     # 区分用户和群组
     is_user = msg['User']['MemberCount'] == 0
     tmp_msg = {
+        # 本地时间戳
         'time': str(datetime.now()),
+        # 来自于某用户, 或某群组的某用户
         'from': msg['User']['NickName'] if is_user else msg['User']['NickName'] + '_' + msg['ActualNickName'],
+        # 用户 id 或 群组id, 用于直接发回
         'from_id': msg['User']['UserName'],
+        # 消息内容
         'content': msg['Text']
     }
     pprint(tmp_msg)
+    print()
+
+    # 存至限长缓存字典
     msgs[msg_id] = tmp_msg
     if len(msgs) > MAX_MSG_COUNT:
         msgs.popitem(last=False)
